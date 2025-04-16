@@ -1,0 +1,1462 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Hero NFT Marketplace</title>
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background-color: #f8f9fa;
+      margin: 0;
+      padding: 20px;
+    }
+
+    h1 {
+      text-align: center;
+      color: #333;
+    }
+
+    .container {
+      max-width: 900px;
+      margin: auto;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 20px;
+    }
+
+    .section {
+      background: #fff;
+      border: 1px solid #ddd;
+      padding: 20px;
+      border-radius: 10px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    }
+
+    .section h2 {
+      font-size: 1.2rem;
+      margin-bottom: 10px;
+    }
+
+    input[type="number"],
+    input[type="text"] {
+      width: 100%;
+      padding: 8px;
+      margin-top: 5px;
+      margin-bottom: 10px;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+    }
+
+    button {
+      width: 100%;
+      padding: 10px;
+      background-color: #007bff;
+      border: none;
+      color: white;
+      font-weight: bold;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background 0.2s ease;
+    }
+
+    button:hover {
+      background-color: #0056b3;
+    }
+
+    p {
+      margin: 5px 0;
+    }
+
+    ul.nft-list {
+      padding-left: 18px;
+    }
+
+    .status {
+      margin-top: 8px;
+      font-size: 0.9em;
+    }
+
+    .success {
+      color: green;
+    }
+
+    .error {
+      color: red;
+    }
+
+    @media screen and (max-width: 600px) {
+      .container {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <h1>🎮 Hero NFT Marketplace</h1>
+  <div id="globalStatus" style="padding: 10px; color: blue; font-weight: bold;"></div>
+
+  <div class="container">
+    <div class="section">
+      <h2>🔐 Kết nối ví</h2>
+      <button onclick="connectWallet()">Kết nối ví</button>
+      <p class="status" id="connectStatus"></p>
+    </div>
+
+    <div class="section">
+      <h2>🧙 Mint Hero NFT</h2>
+      <input type="number" id="mintAmount" placeholder="Số lượng (tối đa 10)" min="1" max="10">
+      <button onclick="mintNFT()">Mint</button>
+      <p class="status" id="mintStatus"></p>
+    </div>
+
+  
+
+    <div class="section">
+      <h2>🛒 List NFT</h2>
+      <input type="number" id="listTokenId" placeholder="ID NFT">
+      <input type="number" step="0.0001" id="listPrice" placeholder="Giá (ETH)">
+      <button onclick="listNFTOnMarketplace()">List</button>
+      <p class="status" id="listStatus"></p>
+    </div>
+
+    <div class="section">
+      <h2>❌ Delist NFT</h2>
+      <input type="number" id="delistTokenId" placeholder="ID NFT">
+      <button onclick="delistNFTFromMarketplace()">Delist</button>
+      <p class="status" id="delistStatus"></p>
+    </div>
+
+
+    <div class="section">
+      <h2>💰 Offer NFT</h2>
+      <input type="number" id="offerTokenId" placeholder="ID NFT">
+      <input type="number" step="0.0001" id="offerPrice" placeholder="Giá offer (ETH)">
+      <button onclick="offerOnNFT()">Gửi offer</button>
+      <p class="status" id="offerStatus"></p>
+    </div>
+
+    <div class="section">
+      <h2>✅ Accept Offer</h2>
+      <input type="number" id="acceptTokenId" placeholder="ID NFT">
+      <button onclick="acceptOfferOnNFT()">Chấp nhận</button>
+      <p class="status" id="acceptStatus"></p>
+    </div>
+    <div class="section">
+        <h2>📦 NFT của bạn</h2>
+        <ul class="nft-list" id="ownedNFTs"></ul>
+        <button onclick="loadOwnedNFTs()">Tải lại NFT</button>
+      </div>
+
+      <div class="section">
+        <h2>🛍 NFT đã được list</h2>
+        <ul class="nft-list" id="listedNFTs"></ul>
+        <button onclick="loadListedNFTs()">Tải lại danh sách</button>
+      </div>
+      
+      <div class="section">
+        <h2>🛍 NFT đã được offer</h2>
+        <ul class="nft-list" id="listedOffers"></ul>
+        <button onclick="loadListedOfferNFTs()">Tải lại danh sách</button>
+      </div>
+  </div>
+
+    <script src="web3.min.js"></script>
+    <script>
+        let web3;
+        let contract;
+        const contractAddress = "0xeEe1BC2c13c49118cB750Dbe4C1784052e0a79f9"; // **ĐIỀN ĐỊA CHỈ CONTRACT CỦA BẠN VÀO ĐÂY**
+        const contractABI =[
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "tokenId",
+				"type": "uint256"
+			}
+		],
+		"name": "acceptOffer",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "to",
+				"type": "address"
+			},
+			{
+				"internalType": "uint256",
+				"name": "tokenId",
+				"type": "uint256"
+			}
+		],
+		"name": "approve",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "tokenId",
+				"type": "uint256"
+			}
+		],
+		"name": "delistNFT",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"stateMutability": "nonpayable",
+		"type": "constructor"
+	},
+	{
+		"inputs": [],
+		"name": "ERC721EnumerableForbiddenBatchMint",
+		"type": "error"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "sender",
+				"type": "address"
+			},
+			{
+				"internalType": "uint256",
+				"name": "tokenId",
+				"type": "uint256"
+			},
+			{
+				"internalType": "address",
+				"name": "owner",
+				"type": "address"
+			}
+		],
+		"name": "ERC721IncorrectOwner",
+		"type": "error"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "operator",
+				"type": "address"
+			},
+			{
+				"internalType": "uint256",
+				"name": "tokenId",
+				"type": "uint256"
+			}
+		],
+		"name": "ERC721InsufficientApproval",
+		"type": "error"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "approver",
+				"type": "address"
+			}
+		],
+		"name": "ERC721InvalidApprover",
+		"type": "error"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "operator",
+				"type": "address"
+			}
+		],
+		"name": "ERC721InvalidOperator",
+		"type": "error"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "owner",
+				"type": "address"
+			}
+		],
+		"name": "ERC721InvalidOwner",
+		"type": "error"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "receiver",
+				"type": "address"
+			}
+		],
+		"name": "ERC721InvalidReceiver",
+		"type": "error"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "sender",
+				"type": "address"
+			}
+		],
+		"name": "ERC721InvalidSender",
+		"type": "error"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "tokenId",
+				"type": "uint256"
+			}
+		],
+		"name": "ERC721NonexistentToken",
+		"type": "error"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "owner",
+				"type": "address"
+			},
+			{
+				"internalType": "uint256",
+				"name": "index",
+				"type": "uint256"
+			}
+		],
+		"name": "ERC721OutOfBoundsIndex",
+		"type": "error"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "owner",
+				"type": "address"
+			}
+		],
+		"name": "OwnableInvalidOwner",
+		"type": "error"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "account",
+				"type": "address"
+			}
+		],
+		"name": "OwnableUnauthorizedAccount",
+		"type": "error"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": true,
+				"internalType": "address",
+				"name": "owner",
+				"type": "address"
+			},
+			{
+				"indexed": true,
+				"internalType": "address",
+				"name": "approved",
+				"type": "address"
+			},
+			{
+				"indexed": true,
+				"internalType": "uint256",
+				"name": "tokenId",
+				"type": "uint256"
+			}
+		],
+		"name": "Approval",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": true,
+				"internalType": "address",
+				"name": "owner",
+				"type": "address"
+			},
+			{
+				"indexed": true,
+				"internalType": "address",
+				"name": "operator",
+				"type": "address"
+			},
+			{
+				"indexed": false,
+				"internalType": "bool",
+				"name": "approved",
+				"type": "bool"
+			}
+		],
+		"name": "ApprovalForAll",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": true,
+				"internalType": "address",
+				"name": "seller",
+				"type": "address"
+			},
+			{
+				"indexed": true,
+				"internalType": "uint256",
+				"name": "tokenId",
+				"type": "uint256"
+			}
+		],
+		"name": "Delisted",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": true,
+				"internalType": "address",
+				"name": "user",
+				"type": "address"
+			},
+			{
+				"indexed": true,
+				"internalType": "uint256",
+				"name": "tokenId",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint8",
+				"name": "rarity",
+				"type": "uint8"
+			}
+		],
+		"name": "HeroMinted",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": true,
+				"internalType": "address",
+				"name": "seller",
+				"type": "address"
+			},
+			{
+				"indexed": true,
+				"internalType": "uint256",
+				"name": "tokenId",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "price",
+				"type": "uint256"
+			}
+		],
+		"name": "Listed",
+		"type": "event"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "tokenId",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "price",
+				"type": "uint256"
+			}
+		],
+		"name": "listNFT",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "amount",
+				"type": "uint256"
+			}
+		],
+		"name": "mintHero",
+		"outputs": [],
+		"stateMutability": "payable",
+		"type": "function"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": true,
+				"internalType": "address",
+				"name": "seller",
+				"type": "address"
+			},
+			{
+				"indexed": true,
+				"internalType": "address",
+				"name": "buyer",
+				"type": "address"
+			},
+			{
+				"indexed": true,
+				"internalType": "uint256",
+				"name": "tokenId",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "price",
+				"type": "uint256"
+			}
+		],
+		"name": "OfferAccepted",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": true,
+				"internalType": "address",
+				"name": "buyer",
+				"type": "address"
+			},
+			{
+				"indexed": true,
+				"internalType": "uint256",
+				"name": "tokenId",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "price",
+				"type": "uint256"
+			}
+		],
+		"name": "Offered",
+		"type": "event"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "tokenId",
+				"type": "uint256"
+			}
+		],
+		"name": "offerNFT",
+		"outputs": [],
+		"stateMutability": "payable",
+		"type": "function"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": true,
+				"internalType": "address",
+				"name": "previousOwner",
+				"type": "address"
+			},
+			{
+				"indexed": true,
+				"internalType": "address",
+				"name": "newOwner",
+				"type": "address"
+			}
+		],
+		"name": "OwnershipTransferred",
+		"type": "event"
+	},
+	{
+		"inputs": [],
+		"name": "renounceOwnership",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "from",
+				"type": "address"
+			},
+			{
+				"internalType": "address",
+				"name": "to",
+				"type": "address"
+			},
+			{
+				"internalType": "uint256",
+				"name": "tokenId",
+				"type": "uint256"
+			}
+		],
+		"name": "safeTransferFrom",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "from",
+				"type": "address"
+			},
+			{
+				"internalType": "address",
+				"name": "to",
+				"type": "address"
+			},
+			{
+				"internalType": "uint256",
+				"name": "tokenId",
+				"type": "uint256"
+			},
+			{
+				"internalType": "bytes",
+				"name": "data",
+				"type": "bytes"
+			}
+		],
+		"name": "safeTransferFrom",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "operator",
+				"type": "address"
+			},
+			{
+				"internalType": "bool",
+				"name": "approved",
+				"type": "bool"
+			}
+		],
+		"name": "setApprovalForAll",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": true,
+				"internalType": "address",
+				"name": "from",
+				"type": "address"
+			},
+			{
+				"indexed": true,
+				"internalType": "address",
+				"name": "to",
+				"type": "address"
+			},
+			{
+				"indexed": true,
+				"internalType": "uint256",
+				"name": "tokenId",
+				"type": "uint256"
+			}
+		],
+		"name": "Transfer",
+		"type": "event"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "from",
+				"type": "address"
+			},
+			{
+				"internalType": "address",
+				"name": "to",
+				"type": "address"
+			},
+			{
+				"internalType": "uint256",
+				"name": "tokenId",
+				"type": "uint256"
+			}
+		],
+		"name": "transferFrom",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "newOwner",
+				"type": "address"
+			}
+		],
+		"name": "transferOwnership",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "withdraw",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "owner",
+				"type": "address"
+			}
+		],
+		"name": "balanceOf",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "tokenId",
+				"type": "uint256"
+			}
+		],
+		"name": "getApproved",
+		"outputs": [
+			{
+				"internalType": "address",
+				"name": "",
+				"type": "address"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "tokenId",
+				"type": "uint256"
+			}
+		],
+		"name": "getHero",
+		"outputs": [
+			{
+				"components": [
+					{
+						"internalType": "uint8",
+						"name": "rarity",
+						"type": "uint8"
+					},
+					{
+						"internalType": "uint8",
+						"name": "strength",
+						"type": "uint8"
+					},
+					{
+						"internalType": "uint8",
+						"name": "agility",
+						"type": "uint8"
+					},
+					{
+						"internalType": "uint8",
+						"name": "intelligence",
+						"type": "uint8"
+					}
+				],
+				"internalType": "struct HeroNFT.Hero",
+				"name": "",
+				"type": "tuple"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "user",
+				"type": "address"
+			}
+		],
+		"name": "getUserNFTs",
+		"outputs": [
+			{
+				"internalType": "uint256[]",
+				"name": "",
+				"type": "uint256[]"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"name": "heroes",
+		"outputs": [
+			{
+				"internalType": "uint8",
+				"name": "rarity",
+				"type": "uint8"
+			},
+			{
+				"internalType": "uint8",
+				"name": "strength",
+				"type": "uint8"
+			},
+			{
+				"internalType": "uint8",
+				"name": "agility",
+				"type": "uint8"
+			},
+			{
+				"internalType": "uint8",
+				"name": "intelligence",
+				"type": "uint8"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "owner",
+				"type": "address"
+			},
+			{
+				"internalType": "address",
+				"name": "operator",
+				"type": "address"
+			}
+		],
+		"name": "isApprovedForAll",
+		"outputs": [
+			{
+				"internalType": "bool",
+				"name": "",
+				"type": "bool"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"name": "listings",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "MAX_PER_WALLET",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "MAX_SUPPLY",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "MINT_PRICE",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "",
+				"type": "address"
+			}
+		],
+		"name": "mintedCount",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "name",
+		"outputs": [
+			{
+				"internalType": "string",
+				"name": "",
+				"type": "string"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"name": "offers",
+		"outputs": [
+			{
+				"internalType": "address",
+				"name": "buyer",
+				"type": "address"
+			},
+			{
+				"internalType": "uint256",
+				"name": "price",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "owner",
+		"outputs": [
+			{
+				"internalType": "address",
+				"name": "",
+				"type": "address"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "tokenId",
+				"type": "uint256"
+			}
+		],
+		"name": "ownerOf",
+		"outputs": [
+			{
+				"internalType": "address",
+				"name": "",
+				"type": "address"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"name": "raritySupply",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "bytes4",
+				"name": "interfaceId",
+				"type": "bytes4"
+			}
+		],
+		"name": "supportsInterface",
+		"outputs": [
+			{
+				"internalType": "bool",
+				"name": "",
+				"type": "bool"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "symbol",
+		"outputs": [
+			{
+				"internalType": "string",
+				"name": "",
+				"type": "string"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "index",
+				"type": "uint256"
+			}
+		],
+		"name": "tokenByIndex",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "owner",
+				"type": "address"
+			},
+			{
+				"internalType": "uint256",
+				"name": "index",
+				"type": "uint256"
+			}
+		],
+		"name": "tokenOfOwnerByIndex",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "tokenId",
+				"type": "uint256"
+			}
+		],
+		"name": "tokenURI",
+		"outputs": [
+			{
+				"internalType": "string",
+				"name": "",
+				"type": "string"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "totalSupply",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	}
+];
+        let currentAccount;
+
+        async function connectWallet() {
+            if (window.ethereum) {
+                try {
+                    const accounts = await ethereum.request({ method: 'eth_requestAccounts' });
+                    currentAccount = accounts[0];
+                    web3 = new Web3(window.ethereum);
+                    contract = new web3.eth.Contract(contractABI, contractAddress);
+                    document.getElementById("connectStatus").innerText = `Đã kết nối: ${currentAccount.substring(0, 6)}...${currentAccount.slice(-4)}`;
+                    loadOwnedNFTs();
+                    loadListedNFTs();
+                    loadListedOfferNFTs();
+                } catch (error) {
+                    document.getElementById("connectStatus").innerText = `Lỗi kết nối: `;
+                    console.error("Lỗi kết nối ví:", error);
+                }
+            } else {
+                document.getElementById("connectStatus").innerText = "Vui lòng cài đặt MetaMask hoặc ví tương thích.";
+            }
+        }
+
+        async function mintNFT() {
+            if (!contract) {
+                document.getElementById("mintStatus").innerText = "Chưa kết nối với contract.";
+                return;
+            }
+            const amount = document.getElementById("mintAmount").value;
+            if (!amount || parseInt(amount) <= 0 || parseInt(amount) > 10) {
+                document.getElementById("mintStatus").innerText = "Vui lòng nhập số lượng hợp lệ (1-10).";
+                return;
+            }
+            const value = Web3.utils.toWei((0.001 * amount).toString(), 'ether');
+            try {
+                const result = await contract.methods.mintHero(amount).send({ from: currentAccount, value: value });
+                document.getElementById("mintStatus").innerText = `Mint thành công! Transaction Hash: ${result.transactionHash.substring(0, 10)}...`;
+                loadOwnedNFTs();
+            } catch (error) {
+                document.getElementById("mintStatus").innerText = `Mint thất bại:`;
+                console.error("Lỗi mint:", error);
+            }
+        }
+
+        async function loadOwnedNFTs() {
+    if (!contract || !currentAccount) {
+        document.getElementById("ownedNFTs").innerHTML = 'Chưa kết nối ví hoặc contract.';
+        return;
+    }
+    try {
+        const tokenIds = await contract.methods.getUserNFTs(currentAccount).call();
+        const ownedNFTsList = document.getElementById("ownedNFTs");
+        ownedNFTsList.innerHTML = '';
+        if (tokenIds.length > 0) {
+            for (const tokenId of tokenIds) {
+                const hero = await contract.methods.getHero(tokenId).call();
+                const rarityText = ["Common", "Rare", "Legendary", "Mythical"][hero[0]];
+                const listItem = document.createElement("li");
+                listItem.innerHTML = `
+                    <strong>ID:</strong> ${tokenId} <br>
+                    <strong>Rarity:</strong> ${rarityText} <br>
+                    <strong>Strength:</strong> ${hero[1]} |
+                    <strong>Agility:</strong> ${hero[2]} |
+                    <strong>Intelligence:</strong> ${hero[3]}
+                `;
+                ownedNFTsList.appendChild(listItem);
+            }
+        } else {
+            ownedNFTsList.innerHTML = 'Bạn chưa sở hữu NFT nào.';
+        }
+    } catch (error) {
+        document.getElementById("ownedNFTs").innerHTML = `Lỗi tải NFT: `;
+        console.error("Lỗi tải NFT:", error);
+    }
+}
+
+        async function listNFTOnMarketplace() {
+            if (!contract || !currentAccount) {
+                document.getElementById("listStatus").innerText = "Chưa kết nối ví hoặc contract.";
+                return;
+            }
+            const tokenId = document.getElementById("listTokenId").value;
+            const price = document.getElementById("listPrice").value;
+            if (!tokenId || !price || parseFloat(price) <= 0) {
+                document.getElementById("listStatus").innerText = "Vui lòng nhập ID NFT và giá hợp lệ.";
+                return;
+            }
+            const priceWei = Web3.utils.toWei(price, 'ether');
+            try {
+                await contract.methods.listNFT(tokenId, priceWei).send({ from: currentAccount });
+                document.getElementById("listStatus").innerText = `Đã list NFT ID ${tokenId} với giá ${price} ETH.`;
+            } catch (error) {
+                document.getElementById("listStatus").innerText = `Lỗi list NFT: `;
+                console.error("Lỗi list NFT:", error);
+            }
+        }
+
+        async function delistNFTFromMarketplace() {
+            if (!contract || !currentAccount) {
+                document.getElementById("delistStatus").innerText = "Chưa kết nối ví hoặc contract.";
+                return;
+            }
+            const tokenId = document.getElementById("delistTokenId").value;
+            if (!tokenId) {
+                document.getElementById("delistStatus").innerText = "Vui lòng nhập ID NFT cần hủy list.";
+                return;
+            }
+            try {
+                await contract.methods.delistNFT(tokenId).send({ from: currentAccount });
+                document.getElementById("delistStatus").innerText = `Đã hủy list NFT ID ${tokenId}.`;
+            } catch (error) {
+                document.getElementById("delistStatus").innerText = `Lỗi hủy list NFT: `;
+                console.error("Lỗi hủy list NFT:", error);
+            }
+        }
+
+        async function offerOnNFT() {
+            if (!contract || !currentAccount) {
+                document.getElementById("offerStatus").innerText = "Chưa kết nối ví hoặc contract.";
+                return;
+            }
+            const tokenId = document.getElementById("offerTokenId").value;
+            const price = document.getElementById("offerPrice").value;
+            if (!tokenId || !price || parseFloat(price) <= 0) {
+                document.getElementById("offerStatus").innerText = "Vui lòng nhập ID NFT và giá offer hợp lệ.";
+                return;
+            }
+            const priceWei = Web3.utils.toWei(price, 'ether');
+            try {
+                await contract.methods.offerNFT(tokenId).send({ from: currentAccount, value: priceWei });
+                document.getElementById("offerStatus").innerText = `Đã offer ${price} ETH cho NFT ID ${tokenId}.`;
+                loadListedOfferNFTs(); // Cập nhật lại danh sách
+            } catch (error) {
+                document.getElementById("offerStatus").innerText = `Lỗi offer NFT: `;
+                console.error("Lỗi offer NFT:", error);
+            }
+        }
+
+        async function acceptOfferOnNFT() {
+            if (!contract || !currentAccount) {
+                document.getElementById("acceptStatus").innerText = "Chưa kết nối ví hoặc contract.";
+                return;
+            }
+            const tokenId = document.getElementById("acceptTokenId").value;
+            if (!tokenId) {
+                document.getElementById("acceptStatus").innerText = "Vui lòng nhập ID NFT để chấp nhận offer.";
+                return;
+            }
+            try {
+                await contract.methods.acceptOffer(tokenId).send({ from: currentAccount });
+                document.getElementById("acceptStatus").innerText = `Đã chấp nhận offer cho NFT ID ${tokenId}.`;
+                loadListedOfferNFTs(); // Cập nhật lại danh sách
+            } catch (error) {
+                document.getElementById("acceptStatus").innerText = `Lỗi chấp nhận offer: `;
+                console.error("Lỗi chấp nhận offer:", error);
+            }
+        }
+
+
+    async function loadListedNFTs() {
+            if (!contract) {
+                document.getElementById("listedNFTs").innerHTML = 'Chưa kết nối contract.';
+                return;
+            }
+
+            try {
+                const totalSupply= await contract.methods.totalSupply().call();
+                const listedNFTsList = document.getElementById("listedNFTs");
+                listedNFTsList.innerHTML = '';
+
+                if (totalSupply > 0) {
+                    for (let i = 1; i <= totalSupply; i++) {
+                        const tokenId = i;
+                        const priceWei = await contract.methods.listings(tokenId).call();
+                        if (priceWei == 0) continue; // Nếu không có giá, bỏ qua
+                        const priceEth = Web3.utils.fromWei(priceWei, 'ether');
+                        const owner = await contract.methods.ownerOf(tokenId).call();
+
+                        const hero = await contract.methods.getHero(tokenId).call();
+                        const rarityText = ["Common", "Rare", "Legendary", "Mythical"][hero[0]];
+                        const listItem = document.createElement("li");
+                        listItem.innerHTML = `
+                            <strong>ID:</strong> ${tokenId} <br>
+                            <strong>Giá:</strong> ${priceEth} ETH<br>
+                            <strong>Rarity:</strong> ${rarityText} <br>
+                            <strong>Strength:</strong> ${hero[1]} |
+                            <strong>Agility:</strong> ${hero[2]} |
+                            <strong>Intelligence:</strong> ${hero[3]} <br>
+                            ${
+                                owner.toLowerCase() !== currentAccount.toLowerCase()
+                                ? `<button onclick="(async () => {
+                                    try {
+                                        await contract.methods.offerNFT(${tokenId}).send({
+                                            from: currentAccount,
+                                            value: ${priceWei}
+                                        });
+                                        document.getElementById('globalStatus').innerText = '✅ Đã gửi offer cho NFT ID ${tokenId}.';
+                                        loadListedOfferNFTs(); // Cập nhật lại danh sách
+                    
+                                    } catch (error) {
+                                        console.error('Lỗi offer:', error);
+                                        document.getElementById('globalStatus').innerText = '❌ Lỗi gửi offer.';
+                                    }
+                                })()">Offer</button>`
+                                : ''
+                            }
+                        `;
+                        listedNFTsList.appendChild(listItem);
+                    }
+                } else {
+                    listedNFTsList.innerHTML = 'Chưa có NFT nào được list.';
+                }
+            } catch (error) {
+                document.getElementById("listedNFTs").innerHTML = 'Lỗi tải danh sách.';
+                console.error("Lỗi load listed NFTs:", error);
+            }
+        }
+
+async function loadListedOfferNFTs() {
+    if (!contract) {
+        document.getElementById("listedOffers").innerHTML = 'Chưa kết nối contract.';
+        return;
+    }
+
+    try {
+        const totalSupply= await contract.methods.totalSupply().call();
+        const OffersList = document.getElementById("listedOffers");
+        OffersList.innerHTML = '';
+
+        if (totalSupply > 0) {
+            for (let i = 1; i <= totalSupply; i++) {
+                const tokenId = i;        
+                const offer = await contract.methods.offers(tokenId).call();
+                const priceWei = offer[1];
+                const buyer = offer[0];
+                try {
+                    if (priceWei == 0) continue; // Nếu không có giá, bỏ qua
+                } catch (error) {
+                    console.error("Lỗi khi lấy giá:", error);
+                    continue;
+                }
+                const priceEth = Web3.utils.fromWei(priceWei, 'ether');
+                const owner = await contract.methods.ownerOf(tokenId).call();
+                const hero = await contract.methods.getHero(tokenId).call();
+                const rarityText = ["Common", "Rare", "Legendary", "Mythical"][hero[0]];
+                const listItem = document.createElement("li");
+                listItem.innerHTML = `
+                    <strong>ID:</strong> ${tokenId} <br>
+                    <strong>Giá:</strong> ${priceEth} ETH<br>
+                    <strong>Rarity:</strong> ${rarityText} <br>
+                    <strong>Strength:</strong> ${hero[1]} |
+                    <strong>Agility:</strong> ${hero[2]} |
+                    <strong>Intelligence:</strong> ${hero[3]} <br>
+                    ${
+                        owner.toLowerCase() === currentAccount.toLowerCase()
+                        ? `<button onclick="(async () => {
+                        try {
+                        await contract.methods.acceptOffer(${tokenId}).send({ from: currentAccount });
+                        document.getElementById('globalStatus').innerText = '✅ Đã chấp nhận offer cho NFT ID ${tokenId}.';
+                        loadListedOfferNFTs(); // Cập nhật lại danh sách
+                        } catch (error) {
+                        console.error('❌ Lỗi chấp nhận offer:', error);
+                        document.getElementById('globalStatus').innerText = '❌ Lỗi chấp nhận offer.';
+                            }
+                        })()">Chấp nhận Offer</button>`
+
+                        : ''
+
+ }
+                `;
+                OffersList.appendChild(listItem);
+            }
+        } else {
+            OffersList.innerHTML = 'Chưa có NFT nào được offer.';
+        }
+    } catch (error) {
+        document.getElementById("globalStatus").innerHTML = 'Lỗi tải danh sách offer.';
+        console.error("Lỗi load listed Offers:", error);
+    }
+}
+        // Kết nối ví khi trang tải
+        window.onload = connectWallet;
+    </script>
+</body>
+</html>
